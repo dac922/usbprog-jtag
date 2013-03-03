@@ -19,11 +19,11 @@
 #ifndef _USBN960X_H
 #define _USBN960X_H
 
-#define DEBUG 0 
+#define DEBUG 0
 
 #include "../usbn960xreg.h"
 #include "../usb11spec.h"
-#include "../fifo.h"
+//#include "../fifo.h"
 
 struct usb_device_descriptor DeviceDescriptor;
 
@@ -44,6 +44,8 @@ struct RxFIFOCaller
   void* func1;
   void* func2;
   void* func3;
+
+  void* nack_callback;
 };
 
 
@@ -107,7 +109,7 @@ struct epinfo {
   unsigned char	  usbnControl;
   unsigned char	  DataPid; // 0 = data0, 1 = data1
   int		  usbnfifo;
-  fifo_t*	  fifo; 
+  //fifo_t*	  fifo; 
   int		  Index;
   int		  Size;
   unsigned char*  Buf;
@@ -117,7 +119,7 @@ unsigned char EP0RXBuf[8];
 
 
 
-void _USBNMemFIFO(fifo_t *fifo,char* data,int size);
+//void _USBNMemFIFO(fifo_t *fifo,char* data,int size);
 
 // system functions
 
@@ -132,6 +134,7 @@ void _USBNSetAddress(DeviceRequest *req);
 void _USBNGetDescriptor(DeviceRequest *req);
 void _USBNSetConfiguration(DeviceRequest *req);
 void _USBNGetConfiguration(DeviceRequest *req);
+void _USBNGetStatus(DeviceRequest *req);
 void _USBNClearFeature(void);
 
 void _USBNToggle(EPInfo* ep);

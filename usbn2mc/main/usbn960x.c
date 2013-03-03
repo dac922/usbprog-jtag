@@ -20,8 +20,9 @@
 #include <stdio.h>
 #include <string.h>
 #include "usbn960x.h"
-#include "../fifo.h"
+//#include "../fifo.h"
 
+#define DEBUG 0
 
 EPInfo	EP0rx;
 EPInfo	EP0tx;
@@ -50,6 +51,7 @@ void _USBNInitEP0(void)
 // copy data to fifo for sending 
 // ********************************************************************
 /// copy mem to software fifo for endpoint
+/*
 void _USBNMemFIFO(fifo_t *fifo,char* data,int size)
 {  
   int i;
@@ -58,7 +60,7 @@ void _USBNMemFIFO(fifo_t *fifo,char* data,int size)
     fifo_put (fifo, (char)data[i]); 
   } 
 }
-
+*/
 
 
 // ********************************************************************
@@ -69,11 +71,40 @@ void _USBNMemFIFO(fifo_t *fifo,char* data,int size)
 void _USBNNackEvent(void)
 {
   unsigned char event;
+  //void (*ptr)();
+  
   event = USBNRead(NAKEV);
+  //SendHex(event);
+  
+  //ptr = rxfifos.nack_callback;
+  //(*ptr)((unsigned int)event);
+
+  if(event & 0x01)
+  {
+
+  }
+  /* transmit fifo 1 */
+  if(event & 0x02)
+  {
+    //USBNWrite(RXC1,FLUSH);	//re-enable the receiver  
+    //USBNWrite(RXC1,RX_EN);	//re-enable the receiver  
+   /* 
+    USBNWrite(TXC1,FLUSH);	//re-enable the receiver  
+    USBNWrite(TXC1,TX_LAST+TX_EN+TX_TOGL);
+    
+    USBNWrite(TXC1,FLUSH);	//re-enable the receiver  
+    USBNWrite(TXC1,TX_LAST+TX_EN);
+   */ 
+    
+    //USBNWrite(TXC1,RX_EN);	//re-enable the receiver  
+
+  }
+
+  /*
   USBNWrite(RXC1,FLUSH);	//re-enable the receiver  
   USBNWrite(RXC1,RX_EN);	//re-enable the receiver  
 #if DEBUG
-  USBNDebug("nack");  
+  USBNDebug("nack event\r\n");
 #endif
   if (EP0tx.Size > EP0tx.usbnfifo)	  //multi-pkt status stage? 
   {
@@ -84,22 +115,24 @@ void _USBNNackEvent(void)
     USBNWrite(RXC0,RX_EN);	//re-enable the receiver  
     EP0tx.DataPid	      = 1;
   }
+  */ 
 }
-
 
 
 
 void _USBNReceiveEvent(void)
 {
   unsigned char event;
-  void (*ptr)();
+  void (*ptr)(void *) = (void*)NULL;
   char buf[64];
   char *bufp=&buf[0];
   event = USBNRead(RXEV);
-  char tmp;
+  //char tmp;
   int i=0;
   
+#if DEBUG
   USBNDebug("rx event\r\n");
+#endif
   if(event & RX_FIFO0) _USBNReceiveFIFO0();
   
   // dynamic function call
@@ -157,7 +190,7 @@ void _USBNReceiveEvent(void)
 void _USBNTransmitEvent(void)
 {
   unsigned char event;
-  void (*ptr)();
+  void (*ptr)(void) = (void *)NULL;
   event = USBNRead(TXEV);
   //USBNDebug("tx event\r\n");
   if(event & TX_FIFO0) _USBNTransmitFIFO0();
@@ -188,7 +221,9 @@ void _USBNAlternateEvent(void)
 {
   unsigned char event;
   event = USBNRead(ALTEV);
+#if DEBUG
   USBNDebug("alt event\r\n");
+#endif
 
   if(event & ALT_RESET)
   {
@@ -198,7 +233,9 @@ void _USBNAlternateEvent(void)
     USBNWrite(TXC0,FLUSH);
     USBNWrite(RXC0,RX_EN);                    // allow reception
     USBNWrite(NFSR,OPR_ST);                   // NFS = NodeOperational
+#if DEBUG
   	USBNDebug("reset\r\n");
+#endif
   }
   if(event & ALT_SD3)
   {
@@ -221,52 +258,14 @@ void _USBNAlternateEvent(void)
   }
   if(event & ALT_EOP)
   {
+#if DEBUG
   	USBNDebug("eop\r\n");
-  }
-
-}
-
-#if 0
-void _USBNAlternateEvent(void)
-{
-  unsigned char event;
-  event = USBNRead(ALTEV);
-  USBNDebug("alt event\r\n");
-
-  if(event & ALT_RESET)
-  {
-    USBNWrite(NFSR,RST_ST);                   // NFS = NodeReset
-    USBNWrite(FAR,AD_EN+0); 
-    USBNWrite(EPC0,0x00);
-    USBNWrite(TXC0,FLUSH);
-    USBNWrite(RXC0,RX_EN);                    // allow reception
-    USBNWrite(NFSR,OPR_ST);                   // NFS = NodeOperational
-  	USBNDebug("reset\r\n");
-  }
-  else if(event & ALT_SD3)
-  {
-    USBNWrite(ALTMSK,ALT_RESUME+ALT_RESET);   // adjust interrupts
-    USBNWrite(NFSR,SUS_ST);                   // enter suspend state
-  	USBNDebug("sd3\r\n");
-  }
-  else if(event & ALT_RESUME)
-  {
-    USBNWrite(ALTMSK,ALT_SD3+ALT_RESET);
-    USBNWrite(NFSR,OPR_ST);
-  	USBNDebug("resume\r\n");
-  }
-  else if(event & ALT_EOP)
-  {
-  	USBNDebug("eop\r\n");
-  }
-
-  else
-  {
-  	USBNDebug("else\r\n");
-  }
-}
-
 #endif
+  }
+
+}
+
+
 // ********************************************************************
 // Receive and Transmit functions for EPs          
 // ********************************************************************
@@ -303,6 +302,9 @@ void _USBNReceiveFIFO0(void)
     switch (req->bmRequestType & 0x60)  // decode request type     
     {
       case DO_STANDARD:			      // standard request 
+	//USBNDebug("HALLO STANDARD ");	
+	//SendHex(req->bRequest);
+	//USBNDebug("\n\r");
         switch (req->bRequest)	      // decode request code     
         {
           case CLR_FEATURE:
@@ -330,8 +332,13 @@ void _USBNReceiveFIFO0(void)
           break;
           case GET_STATUS:
 	  #if DEBUG
-            USBNDebug("GET STATUS\n\r");	
+            USBNDebug("GET STATUS\n\r");
 	  #endif
+	    //_USBNGetStatus(req);
+	    USBNWrite(TXC0,FLUSH);
+	    USBNWrite(TXD0,1);
+	    USBNWrite(TXD0,0);
+	    USBNWrite(TXC0,TX_TOGL+TX_EN);  //enable the TX (DATA1)
           break;
           case SET_ADDRESS:
 	  #if DEBUG
@@ -349,12 +356,13 @@ void _USBNReceiveFIFO0(void)
 	  #if DEBUG
             USBNDebug("SET FEATURE\n\r");	
 	  #endif
+	  USBNWrite(TXC0,TX_TOGL+TX_EN);  //enable the TX (DATA1)
           break;
           case SET_INTERFACE:
 	  #if DEBUG
             USBNDebug("SET INTERFACE\n\r");	
 	  #endif
-	    			USBNWrite(TXC0,TX_TOGL+TX_EN);  //enable the TX (DATA1)
+	  USBNWrite(TXC0,TX_TOGL+TX_EN);  //enable the TX (DATA1)
           break;
           default:				// unsupported standard req
 	  #if DEBUG
@@ -448,7 +456,9 @@ void _USBNTransmitFIFO0(void)
     else                                              
     // this probably means we issued a stall handshake
     {
+#if DEBUG
       USBNDebug("stall handshake ");
+#endif
       //USBNFunctionInfo.GetDesc=0;          // exit multi-packet mode
       USBNWrite(RXC0,RX_EN);               // re-enable the receiver
     }
@@ -457,7 +467,9 @@ void _USBNTransmitFIFO0(void)
   // transmission, or we got here somehow we shouldn't have
   else
   { 
+#if DEBUG
     USBNDebug("tx0 error\n");
+#endif
   }
   // we do this stuff for all tx_0 events
 }
@@ -492,7 +504,7 @@ void _USBNTransmit(EPInfo* ep)
       
       USBNWrite(TXC0,FLUSH);       //send data to the FIFO
       //USBNDebug(" ");
-      for(i=0;((i < 8) & (ep->Index < ep->Size)); i++)
+      for(i=0;((i < 8) && (ep->Index < ep->Size)); i++)
       {
         USBNWrite(TXD0,ep->Buf[ep->Index]);
 	//USBNWrite(TXD0,fifo_get_nowait(EP0tx.fifo));
@@ -584,6 +596,7 @@ void _USBNGetDescriptor(DeviceRequest *req)
 {
   unsigned char index =  req->wValue;
   unsigned char type = req->wValue >> 8;
+//  unsigned char length =  req->wLength;
 
   EP0tx.Index = 0;
   EP0tx.DataPid = 1;
@@ -594,10 +607,16 @@ void _USBNGetDescriptor(DeviceRequest *req)
       USBNDebug("DEVICE DESCRIPTOR\n\r");  
       #endif
       EP0tx.Size = DeviceDescriptor.bLength;
-      EP0tx.Buf = (char*)&(DeviceDescriptor);
+      EP0tx.Buf = (unsigned char*)(&DeviceDescriptor);
       
       // first get descriptor request is
       // always be answered with first 8 unsigned chars of dev descriptor
+      //SendHex(req->wLength);
+      
+      if(req->wLength==0x08)
+	req->wLength=0x40;
+
+
       if(req->wLength==0x40)
         EP0tx.Size = 8;
     break;
@@ -607,8 +626,8 @@ void _USBNGetDescriptor(DeviceRequest *req)
       #endif
 
       // send complete tree
-      EP0tx.Size =req->wLength;
-      EP0tx.Buf = &FinalConfigurationArray[index][0];
+      EP0tx.Size =(unsigned short)req->wLength;
+      EP0tx.Buf = (unsigned char*)&(FinalConfigurationArray[index][0]);
 
     break;
     case STRING:
@@ -620,7 +639,7 @@ void _USBNGetDescriptor(DeviceRequest *req)
 
       if(index >0)
       {
-	EP0tx.Buf = &FinalStringArray[index][0];
+	EP0tx.Buf = (unsigned char*)&(FinalStringArray[index][0]);
 	EP0tx.Size = EP0tx.Buf[0];
       }
       else { 
@@ -630,8 +649,10 @@ void _USBNGetDescriptor(DeviceRequest *req)
 	char lang[]={0x04,0x03,0x09,0x04};
 	//EP0tx.Buf = &FinalStringArray[0][0];
 	//EP0tx.Size = EP0tx.Buf[0];
-	EP0tx.Size=4;
-	EP0tx.Buf=lang;
+	if(req->wLength==1)
+	EP0tx.Size=1;
+	else EP0tx.Size=4;
+	EP0tx.Buf = (unsigned char*)lang;
 
       }
     break;
@@ -642,7 +663,15 @@ void _USBNGetDescriptor(DeviceRequest *req)
   _USBNTransmit(&EP0tx);
 }
 
-
+void _USBNGetStatus(DeviceRequest *req)
+{
+/*
+  char tmp[]={0x01,0x00};
+  EP0tx.Size=4;
+  EP0tx.Buf=tmp;
+  _USBNTransmit(&EP0tx);
+  */
+}
 
 void _USBNSetConfiguration(DeviceRequest *req)
 {
@@ -659,6 +688,9 @@ USBNWrite(EPC1,EP_EN+0x02);      // enable EP1 at adr 1
 USBNWrite(RXC1,FLUSH);
 USBNWrite(EPC2,EP_EN+0x02); 
 USBNWrite(RXC1,RX_EN);
+
+//USBNWrite(NAKMSK,NAK_OUT0|NAK_OUT1);
+
 
 
 //USBNWrite(TXC3,FLUSH);

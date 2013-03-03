@@ -26,8 +26,8 @@
 void USBNInit(void)
 {
   // one and only device descriptor
-  DeviceDescriptor.bLength=0x12; // length of device descriptor
-  DeviceDescriptor.bDescriptorType=0x01;
+  DeviceDescriptor.bLength=sizeof(struct usb_device_descriptor); // length of device descriptor
+  DeviceDescriptor.bDescriptorType=DEVICE;
   DeviceDescriptor.bcdUSB=0x0110;
   DeviceDescriptor.bDeviceClass=0x00;
   DeviceDescriptor.bDeviceSubClass=0x00;
@@ -156,15 +156,15 @@ int USBNAddConfiguration(void)
 
   conf->bLength=sizeof(struct usb_configuration_descriptor);
   //conf->wTotalLength=sizeof(struct usb_configuration_descriptor);
-  conf->wTotalLength=0x09; // will be updated when confarray has been built
-  conf->bDescriptorType=0x02;
+  conf->wTotalLength=sizeof(struct usb_configuration_descriptor); // will be updated when confarray has been built
+  conf->bDescriptorType=CONFIGURATION;
   conf->bNumInterfaces=0x00;
   conf->bConfigurationValue=index; // number of configuration
   conf->iConfiguration=0x00; // string index for configuration 
   conf->bmAttributes=0xA0;  // bus powered
   conf->MaxPower=0x1A;  // max power 
 
-  _USBNAddToList((void*)conf, 0x09,0x02,0,0,0);
+  _USBNAddToList((void*)conf, sizeof(struct usb_configuration_descriptor),CONFIGURATION,0,0,0);
 
   return index;
 }
@@ -177,12 +177,16 @@ void USBNConfigurationName(int configuration, char *name)
   index = _USBNAddStringDescriptor(name);
   // find configuration id  
   struct list_entry *ptr = DescriptorList;
-  char *values; 	      
+  struct usb_configuration_descriptor* conf;
+  
   while(ptr != NULL) {
-    values = (char*)ptr->data;	      
-    if(ptr->type==0x02 && values[5]==configuration) // if descr = confi 
+    if(ptr->type==CONFIGURATION)
     {
-      values[6]=index;
+      conf = (struct usb_configuration_descriptor*)ptr->data;
+      if(conf->bConfigurationValue == (char)configuration)
+      {
+        conf->iConfiguration=index;
+      }
     }
     ptr=ptr->next;
   }
@@ -192,12 +196,16 @@ void USBNConfigurationPower (int configuration, int power)
 {
   // find configuration id  
   struct list_entry *ptr = DescriptorList;
-  char *values; 	      
+  struct usb_configuration_descriptor* conf;
+  
   while(ptr != NULL) {
-    values = (char*)ptr->data;	      
-    if(ptr->type==0x02 && values[5]==configuration) // if descr = confi 
+    if(ptr->type==CONFIGURATION)
     {
-      values[8]=power/2;
+      conf = (struct usb_configuration_descriptor*)ptr->data;
+      if(conf->bConfigurationValue == (char)configuration)
+      {
+          conf->MaxPower=power/2;
+      }
     }
     ptr=ptr->next;
   }
@@ -209,20 +217,24 @@ int USBNAddInterfaceClass (int configuration, int number, char class, char subcl
   int index=0;
   // get new interface number
   struct list_entry *ptr = DescriptorList;
-  char *values; 	      
+  struct usb_configuration_descriptor* conf;
+  
   while(ptr != NULL) {
-    values = (char*)ptr->data;	      
-    if(values[5]==(char)configuration && ptr->type==0x02) // if descr = confi 
+    if(ptr->type==CONFIGURATION)
     {
-      values[4]++;
-      index =  values[4];
+      conf = (struct usb_configuration_descriptor*)ptr->data;
+      if(conf->bConfigurationValue == (char)configuration)
+      {
+        conf->bNumInterfaces++;
+        index = conf->bNumInterfaces;
+      }
     }
     ptr=ptr->next;
   }
   
   struct usb_interface_descriptor* interf;
   interf = (struct usb_interface_descriptor*)malloc(sizeof(struct usb_interface_descriptor));
-  interf->bLength = 0x09;  
+  interf->bLength = sizeof(struct usb_interface_descriptor);  
   interf->bDescriptorType     = INTERFACE;
   interf->bInterfaceNumber     = number; // FIXME
   interf->bAlternateSetting   = 0x00;
@@ -232,7 +244,7 @@ int USBNAddInterfaceClass (int configuration, int number, char class, char subcl
   interf->bInterfaceProtocol   = protocol;
   interf->iInterface           = 0x00;
   
-  _USBNAddToList((void*)interf, 0x09,INTERFACE,(uint8_t)configuration,0,index);
+  _USBNAddToList((void*)interf, sizeof(struct usb_interface_descriptor),INTERFACE,(uint8_t)configuration,0,index);
   return index;
 }
 
@@ -244,20 +256,24 @@ int USBNAddInterface (int configuration, int number)
   int index=0;
   // get new interface number
   struct list_entry *ptr = DescriptorList;
-  char *values; 	      
+  struct usb_configuration_descriptor* conf;
+  
   while(ptr != NULL) {
-    values = (char*)ptr->data;	      
-    if(values[5]==(char)configuration && ptr->type==0x02) // if descr = confi 
+    if(ptr->type==CONFIGURATION)
     {
-      values[4]++;
-      index =  values[4];
+      conf = (struct usb_configuration_descriptor*)ptr->data;
+      if(conf->bConfigurationValue == (char)configuration)
+      {
+        conf->bNumInterfaces++;
+        index = conf->bNumInterfaces;
+      }
     }
     ptr=ptr->next;
   }
   
   struct usb_interface_descriptor* interf;
   interf = (struct usb_interface_descriptor*)malloc(sizeof(struct usb_interface_descriptor));
-  interf->bLength = 0x09;  
+  interf->bLength = sizeof(struct usb_interface_descriptor);  
   interf->bDescriptorType     = INTERFACE;
   interf->bInterfaceNumber     = number; // FIXME
   interf->bAlternateSetting   = 0x00;
@@ -267,7 +283,7 @@ int USBNAddInterface (int configuration, int number)
   interf->bInterfaceProtocol   = 0x00;
   interf->iInterface           = 0x00;
   
-  _USBNAddToList((void*)interf, 0x09,INTERFACE,(uint8_t)configuration,0,index);
+  _USBNAddToList((void*)interf, sizeof(struct usb_interface_descriptor),INTERFACE,(uint8_t)configuration,0,index);
   return index;
 }
 
@@ -279,13 +295,14 @@ void USBNInterfaceName(int configuration, int interface, char *name)
   index = _USBNAddStringDescriptor(name);
   // find configuration id  
   struct list_entry *ptr = DescriptorList;
-  char *values; 	      
-  while(ptr != NULL) {
-    values = (char*)ptr->data;	      
+  struct usb_interface_descriptor* interf;
+      
+  while(ptr != NULL) {      
     //if(ptr->type==0x04 && ptr->conf==configuration && values[2]==interface) // if descr = confi 
-    if(ptr->type==0x04 && ptr->conf==configuration && ptr->index==interface) // if descr = confi 
+    if(ptr->type==INTERFACE && ptr->conf==configuration && ptr->index==interface) // if descr = confi 
     {
-      values[8]=index;
+       interf = (struct usb_interface_descriptor*)ptr->data;
+       interf->iInterface=index;
     }
     ptr=ptr->next;
   }
@@ -296,12 +313,14 @@ void USBNAlternateSetting(int configuration, int interface, int setting)
 {
   // find configuration id  
   struct list_entry *ptr = DescriptorList;
-  char *values; 	      
-  while(ptr != NULL) {
-    values = (char*)ptr->data;	      
-    if(ptr->type==0x04 && ptr->conf==configuration && ptr->index==interface) // if descr = confi 
+  struct usb_interface_descriptor* interf;
+      
+  while(ptr != NULL) {      
+    //if(ptr->type==0x04 && ptr->conf==configuration && values[2]==interface) // if descr = confi 
+    if(ptr->type==INTERFACE && ptr->conf==configuration && ptr->index==interface) // if descr = confi 
     {
-      values[3]=setting;
+       interf = (struct usb_interface_descriptor*)ptr->data;
+       interf->bAlternateSetting=setting;
     }
     ptr=ptr->next;
   }
@@ -340,16 +359,26 @@ void USBNAddInEndpoint(int configuration, int interface, int epnr,
   _USBNAddEndpoint(configuration,interface,epnr,epadr+0x80,attr,fifosize,intervall);
 }
 
+
+void USBNNackEvent(void *callback)
+{
+   rxfifos.nack_callback = callback;
+}
+
+
 void _USBNAddEndpoint(int configuration, int interface, int epnr, int epadr,char attr, int fifosize, int intervall)
 {
 
   // update  interface endpoint list
   struct list_entry *ptr = DescriptorList;
-  char *values; 	      
+  struct usb_interface_descriptor* interf;
+  
   while(ptr != NULL) {
-    values = (char*)ptr->data;	      
-    if(configuration==ptr->conf && ptr->index==interface && ptr->type==0x04) // if descr = confi 
-      values[4]++;
+    if(ptr->type==INTERFACE && ptr->conf==configuration && ptr->index==interface)
+    {
+      interf = (struct usb_interface_descriptor*)ptr->data;
+      interf->bNumEndpoints++;
+    }
     ptr=ptr->next;
   }
   
@@ -363,7 +392,7 @@ void _USBNAddEndpoint(int configuration, int interface, int epnr, int epadr,char
   endpoint->wMaxPacketSize    = (short int)fifosize;  
   endpoint->bIntervall        = (unsigned char)intervall;  
   
-  _USBNAddToList((void*)endpoint, 0x07,ENDPOINT,
+  _USBNAddToList((void*)endpoint, sizeof(struct usb_endpoint_descriptor),ENDPOINT,
 		    (uint8_t)configuration,(uint8_t)interface,0);
 }
 
@@ -376,16 +405,18 @@ void _USBNCreateConfDescrField(void)
   
   int conf=0;
   int i,j,x;
-  int desclen=0x09;
-  int index,len;
-  char *values=NULL;
-  char *actualconf=NULL;
+  int desclen=sizeof(struct usb_configuration_descriptor);
+  int index;
+  //char *values=NULL
+  struct usb_interface_descriptor* pinterf = NULL;
+  struct usb_configuration_descriptor* pconf = NULL;
+  struct usb_configuration_descriptor* actualconf = NULL;
 
 
   // number of configurations
   ptr = DescriptorList;
   while(ptr != NULL) {
-    if(ptr->type==0x02)
+    if(ptr->type==CONFIGURATION)
       conf++;
     ptr=ptr->next;
   }
@@ -397,18 +428,19 @@ void _USBNCreateConfDescrField(void)
   // length for every configuration
   for(i=1;i<=conf;i++)
   {
+    desclen=sizeof(struct usb_configuration_descriptor);
+
     ptr = DescriptorList;
-    desclen=0x09;
     while(ptr != NULL) 
     {
-      values = (char*)ptr->data;	      
+      pconf = (struct usb_configuration_descriptor*)ptr->data;
       if(ptr->conf==i)
 	desclen=desclen+ptr->len;
 
-      // bConfigurationValue = value[5] = number of configuration
-      if((values[5]==(char)i) && (ptr->type==0x02))
+      // number of configuration
+      if((pconf->bConfigurationValue==(char)i) && (ptr->type==CONFIGURATION))
       {
-	actualconf = values;
+	actualconf = pconf;
       }	
       ptr=ptr->next;
     }
@@ -416,17 +448,15 @@ void _USBNCreateConfDescrField(void)
     FinalConfigurationArray[conf-1] = (char*)malloc(sizeof(char)*desclen);
     
     // configuration descriptor
-    
-    len = 9; 
-    for(index=0;index<len;index++)
-      FinalConfigurationArray[conf-1][index] = actualconf[index];
+    for(index=0;index<sizeof(struct usb_configuration_descriptor);index++)
+      FinalConfigurationArray[conf-1][index] = ((char*)actualconf)[index];
       
     // update configuration total length
-    FinalConfigurationArray[conf-1][2] = desclen+9; // FIXME
+    FinalConfigurationArray[conf-1][2] = desclen; // FIXME
   }
 
   // next index start`s here ( confi descr is always 9 signs long )
-  index = 9;
+  index = sizeof(struct usb_configuration_descriptor);
   int numofinterf=0;
   struct list_entry *findep;
   char *endpoint;
@@ -437,10 +467,10 @@ void _USBNCreateConfDescrField(void)
     ptr = DescriptorList;
     while(ptr != NULL) 
     {
-      values = (char*)ptr->data;	      
-      if(values[1]==0x02 && values[5]==i)
+      pconf = (struct usb_configuration_descriptor*)ptr->data;
+      if(pconf->bDescriptorType==CONFIGURATION && pconf->bConfigurationValue==(char)i)
       {
-	numofinterf = values[4];
+	numofinterf = pconf->bNumInterfaces;
 	break;
       }
       ptr=ptr->next;
@@ -453,14 +483,14 @@ void _USBNCreateConfDescrField(void)
       ptr = DescriptorList;
       while(ptr != NULL) 
       {
-	values = (char*)ptr->data;	      
+	pinterf = (struct usb_interface_descriptor*)ptr->data;	      
 	//if(values[1]==0x04 && values[2]==j && ptr->conf==i)
-	if(values[1]==0x04 && ptr->index==j && ptr->conf==i)
+	if(pinterf->bDescriptorType==INTERFACE && ptr->index==j && ptr->conf==i)
 	{
 	  // *** copy interface
-	  for(x=0;x<9;x++)
+	  for(x=0;x<sizeof(struct usb_interface_descriptor);x++)
 	  {
-	    FinalConfigurationArray[i-1][index] = values[x];
+	    FinalConfigurationArray[i-1][index] = ((char*)pinterf)[x];
 	    index++;
 	  }
 	  // get number of endpoints = values[4]
@@ -470,11 +500,11 @@ void _USBNCreateConfDescrField(void)
 	    findep = DescriptorList;
 	    while(findep!=NULL)
 	    {
-	      if(findep->type==0x05 && findep->conf==i && findep->interf==j)
+	      if(findep->type==ENDPOINT && findep->conf==i && findep->interf==j)
 	      {
 		//USBNDebug("copy ep\r\n");
 		endpoint = (char*)findep->data;	      
-		for(x=0;x<7;x++)
+		for(x=0;x<sizeof(struct usb_endpoint_descriptor);x++)
 		{
 		  FinalConfigurationArray[i-1][index] = endpoint[x];
 		  index++;
@@ -555,8 +585,6 @@ void USBNStart(void)
   while(USBNRead(MCNTRL)&SRST);
 
   USBNWrite(CCONF, 0x02);           // clock to 16 MHz
-  USBNWrite(NAKMSK,0xFF);
-  USBNWrite(NAKMSK,NAK_OUT0);
   USBNWrite(FAR,AD_EN+0x00);            // set default address
   USBNWrite(EPC0,DEF);
   USBNWrite(TXC0,FLUSH);            // FLUSHTX0;
@@ -567,7 +595,10 @@ void USBNStart(void)
   USBNWrite(RXMSK, RX_FIFO0+RX_FIFO1+RX_FIFO2+RX_FIFO3);            // data incoming EP0
   USBNWrite(TXMSK, TX_FIFO0+TX_FIFO1+TX_FIFO2+TX_FIFO3);            // data incoming EP0
  
-  USBNWrite(ALTMSK, ALT_RESET+ALT_SD3+ALT_EOP);
+  USBNWrite(ALTMSK, ALT_RESET+ALT_SD3+ALT_EOP+ALT_RESUME);
+  USBNWrite(NAKMSK,NAK_OUT0+NAK_OUT1+NAK_IN0+NAK_IN1);
+  //USBNWrite(NAKMSK,NAK_OUT0);
+
   USBNWrite(MAMSK, (INTR_E+RX_EV+ALT+TX_EV+NAK) );
  
   
@@ -585,16 +616,17 @@ void USBNStart(void)
 
 void USBNInterrupt(void)
 {
-  //UARTWrite("irq\r\n");
   unsigned char maev,mask;
+  //UARTWrite("irq\r\n");
   
   maev = USBNRead(MAEV);
+  //SendHex(maev);
 
+  if(maev & NAK) _USBNNackEvent(); 
   if(maev & RX_EV)  _USBNReceiveEvent();
-  else if(maev & TX_EV) _USBNTransmitEvent();
-  else if(maev & ALT)   _USBNAlternateEvent();
-  else if(maev & NAK)   _USBNNackEvent();
-
+  if(maev & TX_EV) _USBNTransmitEvent();
+  if(maev & ALT)   _USBNAlternateEvent();
+  
   mask = USBNRead(MAMSK);
   USBNWrite(MAMSK,0x00);                  // disable irq
   USBNWrite(MAMSK,mask);
@@ -618,7 +650,7 @@ int _USBNAddStringDescriptor(char *string)
   char *newstring = (char*)malloc(strlen(string)*2+2);
   
   newstring[0]=(strlen(string)*2)+2; // length;
-  newstring[1]=0x03; //Descriptor Type
+  newstring[1]=STRING; //Descriptor Type
 
   // build string like it is defined in usb spec
   for(i=0;i<strlen(string);i++)

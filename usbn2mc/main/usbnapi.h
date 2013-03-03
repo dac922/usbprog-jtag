@@ -21,7 +21,7 @@
 
 #include "usbn960x.h"
 #include "../usbn960xreg.h"
-#include "../fifo.h"
+//#include "../fifo.h"
 
 void _USBNAddToList( void* data, uint8_t len, 
   uint8_t type,uint8_t conf,uint8_t interf,uint8_t index);
@@ -94,6 +94,8 @@ void USBNAddInEndpoint(int configuration, int interface, int epnr,
 void _USBNAddEndpoint(int configuration, int interface, int epnr, 
 		int epadr,char attr, int fifosize, int intervall);
 
+/// call at nack event
+void USBNNackEvent(void *callback);
 
 /// transmit data to host
 void USBNSendData(int fifonumber, char *data);

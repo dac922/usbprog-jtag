@@ -29,7 +29,7 @@
 
 	/* Function Prototypes: */
 
-  void ProcessData();
+  void ProcessData(void);
   void USBMessageSend(uint8_t *, uint16_t);
 
 #endif //USBPROG_JTAG

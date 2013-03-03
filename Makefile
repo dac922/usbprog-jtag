@@ -287,7 +287,8 @@ eep: $(TARGET).eep
 lss: $(TARGET).lss 
 sym: $(TARGET).sym
 hex2bin:
-	hex2bin $(TARGET).hex
+	#hex2bin $(TARGET).hex
+	avr-objcopy -I ihex -O binary $(TARGET).hex $(TARGET).bin
 
 
 # Eye candy.

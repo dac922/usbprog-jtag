@@ -29,14 +29,14 @@ uint16_t dataToHostSize=0;
 
 volatile uint8_t resetJtagTransfers=0;
 
-SIGNAL(SIG_UART_RECV)
+SIGNAL(USART_RXC_vect)
 {
  //Terminal(UARTGetChar());
  //UARTWrite("usbn>");
 }
 
 
-SIGNAL(SIG_INTERRUPT0)
+SIGNAL(INT0_vect)
 {
   USBNInterrupt();
 }
@@ -108,7 +108,7 @@ void MainTask(uint8_t  *usb_out)
   }
 }
 
-void ProcessData()
+void ProcessData(void)
 {
   if(dataFromHostSize>0) {        
     //first byte is always the command
@@ -184,6 +184,7 @@ int main(void)
 {
   int conf, interf;
 	uint16_t i = 0;
+  struct list_entry *tmp;
 
   UARTInit();
 
@@ -222,6 +223,7 @@ int main(void)
   
   USBNDeviceManufacture ("Cahya Wirawan");
   USBNDeviceProduct	("usbprog-jtag");
+  //USBNDeviceSerialNumber("1");
 
   conf = USBNAddConfiguration();
 
@@ -247,6 +249,25 @@ int main(void)
 		wait_ms(100);
 		PORTA &= ~(1<<PA4); //off
 		wait_ms(5000);
+#if 1
+		UARTWrite("\n\rAAAA:\n\r");  
+		for (i=0;i<18;i++)
+		{
+			SendHex((*((char*)&DeviceDescriptor + i)));
+		}
+		UARTWrite("\n\rBBBB\n\r");
+		
+		tmp = DescriptorList;
+		while(tmp != NULL) {
+		  for (i=0;i<tmp->len;i++)
+		  {
+		    SendHex((*((char*)tmp->data + i)));
+		  }
+		  tmp=tmp->next;
+		  UARTWrite("\n\r");
+	        }
+		UARTWrite("\n\rCCCC\n\r");
+#endif
 	}
 }
 
